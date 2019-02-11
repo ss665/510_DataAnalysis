@@ -5,8 +5,9 @@
 
 ecoregions <- readOGR(dsn = "./SpatialFiles/", "tnc_terr_ecoregions")
 
+ecoregions$RealmMHT
+
 biomes <- unionSpatialPolygons(ecoregions, ecoregions@data$WWF_REALM2)
-getSpPPolygonsIDSlots(ecoregions)
 biomes2 <- biomes
 pid <- sapply(slot(biomes2, "polygons"), function(x) slot(x, "ID"))
 # Create dataframe with correct rownames
@@ -21,7 +22,8 @@ biomes2 <- SpatialPolygonsDataFrame(biomes2, p.df)
 writeOGR(obj = biomes2 , dsn = "./SpatialFiles/", layer = "Lg_Ecoregions", driver = "ESRI Shapefile",
          overwrite = TRUE)
 
-regions <- unionSpatialPolygons(ecoregions, ecoregions@data$WWF_MHTNAM)
+regions <- unionSpatialPolygons(ecoregions, ecoregions@data$RealmMHT)
+over(regions2, biomes2)
 plot(regions)
 rid <- sapply(slot(regions, "polygons"), function(x) slot(x, "ID"))
 # Create dataframe with correct rownames
@@ -31,8 +33,9 @@ for (i in 1:nrow(r.df)){
    region.vec[i] <- regions@polygons[[r.df$ID[i]]]@ID
 }
 r.df$region <- region.vec
+
 regions2 <- gSimplify(regions, .1)
 plot(regions2)
-regions2 <- SpatialPolygonsDataFrame(regions2, r.df)
-writeOGR(obj = regions2 , dsn = "./SpatialFiles/", layer = "Sm_Ecoregions", driver = "ESRI Shapefile",
+regions.spdf <- SpatialPolygonsDataFrame(regions, r.df)
+writeOGR(obj = regions.spdf , dsn = "./SpatialFiles/", layer = "Sm_Ecoregions", driver = "ESRI Shapefile",
          overwrite = TRUE)

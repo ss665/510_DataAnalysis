@@ -4,3 +4,8 @@
 .Ruserdata
 .DS_Store
 Species_Pts/
+*.tif
+*.grd
+*.gri
+*.zip
+MaxentModels/
