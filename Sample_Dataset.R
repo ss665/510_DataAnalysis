@@ -21,6 +21,7 @@ require(rgbif)
 require(rgdal)
 require(rgeos)
 require(maptools)
+require(sp)
 
 
 gbif_user <- "ss665"
@@ -62,17 +63,3 @@ get.output <- occ_download_get(key = dforig[[1]], "./Species_Pts/", overwrite = 
 df.orig <- occ_download_import(as.download("./Species_Pts/0038395-181108115102211.zip"), path = "./Species_Pts")
 data.pts <- read.csv("./Species_Pts/Calypte.anna/occurrence.csv")
 
-ecoregions <- readOGR(dsn = "./SpatialFiles/", "tnc_terr_ecoregions")
-
-biomes <- unionSpatialPolygons(ecoregions, ecoregions@data$WWF_REALM2)
-biomes2 <- gSimplify(biomes, .1)
-biomes2 <- SpatialPolygonsDataFrame(biomes2, p.df)
-pid <- sapply(slot(biomes2, "polygons"), function(x) slot(x, "ID"))
-                                    
-# Create dataframe with correct rownames
-p.df <- data.frame( ID=1:length(biomes2), row.names = pid)  
-writeOGR(obj = biomes2 , dsn = "./SpatialFiles/", layer = "Lg_Ecoregions", driver = "ESRI Shapefile",
-                   overwrite = TRUE)
-
-regions <- unionSpatialPolygons(ecoregions, ecoregions@data$WWF_MHTNAM)
-plot(regions)
