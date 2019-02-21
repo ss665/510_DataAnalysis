@@ -151,144 +151,78 @@ compare <- data.frame("species" = character(), "thresholdRegion" = numeric(), "S
 gbif.prj <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
 
 
-species <- species.df[i, 1]
+require(DescTools)
 
-raster_area <- function(area_raster){
-   area_raster[area_raster==0] <- NA
-   cell_size <- area(area_raster, na.rm = TRUE, weights = FALSE)
-   cell_size <- cell_size[!is.na(cell_size)]
-   raster_area <- length(cell_size) * median(cell_size)
-   if (length(raster_area) == 0) {return(0)}
-   return(raster_area)
-}
-
-for (i in 1:sample.df){
-   species <- sample.df[i, 1]
-   # Run maxent
-   # Region first
-   for.maxent.full.region <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
-                                    gsub(" ", ".", species), ".maxentdatafile.region.csv", sep = ""), row.names = 1)
-   predsnums <- c(1, 2, 5, 6, 7)
-   preds.region <- for.maxent.full.region[,predsnums+3]
-   resp.region <- for.maxent.full.region[,"resp"] 
-   thisRegMult <- 1
-   params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false")
-   require(rJava)
-   maxent.model.region <- maxent(x = preds.region, p = resp.region, path = "./MaxentModels/ScratchDir/",
-                       args = params)
-   curPredsRaster <- clim[[predsnums]]
-   names(curPredsRaster) <- colnames(preds.region)
-   dir.create(paste0("./MaxentModels/",gsub(" ", ".", species)))
-   sp.raster.region <- predict(model = maxent.model.region, object = curPredsRaster, progress = "text",
-                        filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                       ".full.region.tif"), overwrite = TRUE)
-   thresh.region <- maxent.model.region@results[38]
-   sp.raster.thresh.region <- sp.raster.region
-   sp.raster.thresh.region[sp.raster.thresh.region<thresh.region] = 0
-   avg.suit.region <- mean(sp.raster.region[sp.raster.region>0])
-   thresh.area.region <- raster_area(sp.raster.thresh.region)
-   plot(sp.raster.region)
-   plot(sp.raster.thresh.region)
-   writeRaster(sp.raster.thresh.region, filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                                ".region.thresh.tif"), overwrite = TRUE)
-   
-# Biome
-   for.maxent.full.biome <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
-                                  gsub(" ", ".", species), ".maxentdatafile.biome.csv", sep = ""), row.names = 1)
-   preds.biome <- for.maxent.full.biome[,predsnums+3]
-   resp.biome <- for.maxent.full.biome[,"resp"] 
-   maxent.model.biome <- maxent(x = preds.biome, p = resp.biome, path = "./MaxentModels/ScratchDir/",
-                       args = params)
-   sp.raster.biome <- predict(model = maxent.model.biome, object = curPredsRaster, progress = "text",
-                     filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                       ".full.biome.tif"), overwrite = TRUE)
-
-   thresh.biome <- maxent.model.biome@results[38]
-   sp.raster.thresh.biome <- sp.raster.biome
-   sp.raster.thresh.biome[sp.raster.thresh.biome<thresh.biome] = 0
-   avg.suit.biome <- mean(sp.raster.biome[sp.raster.biome>0])
-   thresh.area.biome <- raster_area(sp.raster.thresh.biome)
-   writeRaster(sp.raster.thresh.biome, filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                                      ".biome.thresh.tif"), overwrite = TRUE)
-   this.row <- data.frame("species" = species, "thresholdRegion" = thresh.region, "SuitRegion" = avg.suit.region, 
-                       "AreaRegion" = thresh.area.region, "thresholdBiome" = thresh.biome, 
-                       "SuitBiome" = avg.suit.biome, "AreaBiome" = thresh.area.biome)
-
-   compare <- rbind(this.row, compare)
-   
-}
-
-
-
-### Comparison method
-
-overlap <- function(raster1, raster2){
-   raster1[raster1>0] <- 1
-   raster2[raster2>0] <- 1
-   add <- raster1+raster2
-   add[add<2] <- 0
-   return(add)
-}
-raster_area <- function(area_raster){
-   area_raster[area_raster==0] <- NA
-   cell_size <- area(area_raster, na.rm = TRUE, weights = FALSE)
-   cell_size <- cell_size[!is.na(cell_size)]
-   raster_area <- length(cell_size) * median(cell_size)
-   if (length(raster_area) == 0) {return(0)}
-   return(raster_area)
-}
-
-
-
-clim <- brick("clim10m")
-
-
-overlap.df <- data.frame("species" =character(), "Area.B" = double(),
-                         "Area.Overlap.Upper.B" = double(), "Area.Overlap.Lower.B" = double(), 
-                         "Area.R" = double(), "Area.Overlap.Upper.R" = double(), 
-                         "Area.Overlap.Lower.R" = double(), "Area.Upper" = double(),
-                         "Area.Lower" = double())
+species.df <- read.csv("simple.species.csv", row.names = 1, stringsAsFactors = FALSE)
 species.df.full <- read.csv("Species_Table_021619.csv", row.names = 1, stringsAsFactors = FALSE)
-starttime <-Sys.time()
-
+df <- data.frame("species" = character(), "full.area" = numeric(), "above.lower.crit" = numeric(), "below.lower.crit" = numeric(),
+                 "above.upper.crit" = numeric(), "below.upper.crit" = numeric(), 
+                 "area.between.crits" = numeric())
+pts.climate.df <- data.frame("species" = character(), "below.maxtemp" = numeric(), 
+                             "above.maxtemp" = numeric(), "below.mintemp" = numeric(), 
+                             "above.mintemp" = numeric(), "maxtemp.loc" = numeric(), 
+                             "mintemp.loc" = numeric(), "maxcrit" = numeric(), "mincrit" = numeric(),
+                             "nobs" = integer())
+sample.df <- species.df[c(154, 376, 393, 19, 409, 361, 131, 26, 281, 133),]
+# type in biome or region here to get appropriate points
+bor = "biome"
 for (i in 1:nrow(sample.df)){
-   print(paste(i, "/", nrow(sample.df)))
-   species <- sample.df[i, 1]
+   species = sample.df[i, 1]
    print(species)
-   
+   for.maxent.full <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
+                                     gsub(" ", ".", species), ".maxentdatafile.",bor,".csv", sep = ""), row.names = 1)
    upper.crit <- species.df.full$UCT...C.[species.df.full$Species==species]
    lower.crit <-species.df.full$LCT...C.[species.df.full$Species==species]
+   predsnums <- c(1, 2, 5, 6, 7)
+   preds <- for.maxent.full[,predsnums+3]
+   resp <- for.maxent.full[,"resp"] 
+   thisRegMult <- 1
+   params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false")
+   dir.create(paste0("./MaxentModels/",gsub(" ", ".", species)))
+   maxent.model <- maxent(x = preds, p = resp, path = paste0("./MaxentModels/",gsub(" ", ".", species)),
+                          args = params, silent = FALSE)
+   #########
+   curPredsRaster <- clim[[predsnums]]
+   names(curPredsRaster) <- colnames(preds)
+   sp.raster <- predict(model = maxent.model, object = curPredsRaster, progress = "text",
+                        filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
+                                          ".full.tif"), overwrite = TRUE)
+   par(mfrow = c(1,1))
+   plot(sp.raster, main = "Region Amadina fasciata")
+   species.pts.spdf <- readOGR(dsn = paste0("./Species_Pts/", gsub(" ", ".", species), "/"), 
+                               layer = paste0(gsub(" ", ".", species),"sp.pts"))
+   random.pts.spdf <- SpatialPoints(coordinates(for.maxent.full[for.maxent.full$resp==0,][,2:3]), proj4string=gbif.prj)
+   plot(random.pts.spdf, add = TRUE)
+   plot(species.pts.spdf, add = TRUE, col = "red")
+   ######
+   par(mfrow = c(2, 2))
+   areas.row <- AreaUnderResponseCurves(x = maxent.model, var = c("annualmeantemp", "maxtempwarmestmonth", "mintempcoldestmonth"), at = median,
+                                        expand = 10, data = NULL, fun = predict, upper.crit = upper.crit, lower.crit = lower.crit)
+   df <- rbind(cbind("species" = species, areas.row), df)
+   write.csv(df, paste0("./SummaryTables/response.suitability.",bor,".csv"))
    
-   upper.crit.raster <- clim[[5]] <= upper.crit
-   lower.crit.raster <- clim[[6]] >= lower.crit
-   data.thresh.region <- raster(paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                       ".region.thresh.tif"))
-   overlap.upper.region <- overlap(data.thresh.region, upper.crit.raster)
-   overlap.lower.region <- overlap(data.thresh.region, lower.crit.raster)
    
-   data.thresh.biome <- raster(paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                                      ".biome.thresh.tif"))
-   overlap.upper.biome <- overlap(data.thresh.biome, upper.crit.raster)
-   overlap.lower.biome <- overlap(data.thresh.biome, lower.crit.raster)
-   this.row <- data.frame("species" =species, "Area.b" = raster_area(data.thresh.biome)/1000, 
-                          "Area.Overlap.Upper.B" = raster_area(overlap.upper.biome)/1000, 
-                          "Area.Overlap.Lower.B" = raster_area(overlap.lower.biome)/1000,
-                          "Area.R" = raster_area(data.thresh.region)/1000, 
-                          "Area.Overlap.Upper.R" = raster_area(overlap.upper.region)/1000, 
-                          "Area.Overlap.Lower.R" = raster_area(overlap.lower.region)/1000,
-                          "Area.Upper" = raster_area(upper.crit.raster)/1000, 
-                          "Area.Lower" = raster_area(lower.crit.raster)/1000)
-   print(this.row)
-   overlap.df <- rbind(this.row, overlap.df)
-   write.csv(overlap.df, "./SummaryTables/areaoverlap.csv")
-   #cur.runtime <- Sys.time()-starttime
+   #Evaluating climate at occurence points
+   species.pts.climate <- dplyr::filter(for.maxent.full, for.maxent.full$resp == 1)
+   species.pts.climate <- species.pts.climate[!is.na(species.pts.climate$maxtempwarmestmonth),]
+   below.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth <= upper.crit)
+   above.mintemp <- sum(species.pts.climate$mintempcoldestmonth >= lower.crit)
+   above.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth > upper.crit)
+   below.mintemp <- sum(species.pts.climate$mintempcoldestmonth < lower.crit)
+   
+   
+   maxtemp.loc <- max(species.pts.climate$maxtempwarmestmonth)
+   mintemp.loc <- min(species.pts.climate$mintempcoldestmonth)
+   meantemp.loc <- mean(species.pts.climate$annualmeantemp)
+   nobs <- nrow(species.pts.climate)
+   
+   pts.climate.df <- rbind(data.frame("species" = species, "below.maxtemp" = below.maxtemp, 
+                                      "above.maxtemp" = above.maxtemp, "below.mintemp" = below.mintemp, 
+                                      "above.mintemp" = above.mintemp, "maxtemp.loc" = maxtemp.loc, 
+                                      "mintemp.loc" = mintemp.loc, "meantemp.loc" = meantemp.loc,
+                                      "nobs" = nobs, "maxcrit" = upper.crit, "mincrit" = lower.crit), pts.climate.df)
+   write.csv(pts.climate.df, paste0("./SummaryTables/ptssuitability.",bor,".csv"))
 }
-
-
-#cur.runtime <- Sys.time()-starttime
-
-
-
 
 ### misc code
 #region.spdf <- SpatialPointsDataFrame(coords = data.frame(for.maxent.full.region$x, for.maxent.full.region$y),

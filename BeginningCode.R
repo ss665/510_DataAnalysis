@@ -112,19 +112,6 @@ write.csv(for.maxent.full, paste("./Species_Pts/", gsub(" ", ".", species), "/",
 # annualmeantemp [1], meandiurnalrange [2], maxtempwarmestmonth [5],
 # mintempcoldestmonth [6], annualrange [7]
 predsnums <- c(1, 2, 5, 6, 7)
-preds <- for.maxent.full[,predsnums+3]
-resp <- for.maxent.full[,"resp"] 
-thisRegMult <- 1
-params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false")
-require(rJava)
-maxent.model <- maxent(x = preds, p = resp, path = "./MaxentModels/ScratchDir/",
-                       args = params)
-curPredsRaster <- clim[[predsnums]]
-names(curPredsRaster) <- colnames(preds)
-#dir.create(paste0("./MaxentModels/",gsub(" ", ".", species)))
-sp.raster <- predict(model = maxent.model, object = curPredsRaster, progress = "text",
-        filename = paste0("./MaxentModels/",gsub(" ", ".", species),"/", gsub(" ", ".", species),
-                         ".full.tif"), overwrite = TRUE)
 thresh <- maxent.model@results[38]
 sp.raster.thresh <- sp.raster
 sp.raster.thresh[sp.raster.thresh<thresh] = 0
@@ -190,11 +177,14 @@ starttime <-Sys.time()
 
 require(MIAmaxent)
 require(maxnet)
-# Trying Response curve method
 
+# Trying Response curve method
+species = species.df[i, 1]
+species.df <- read.csv("simple.species.csv", row.names = 1, stringsAsFactors = FALSE)
+species.df.full <- read.csv("Species_Table_021619.csv", row.names = 1, stringsAsFactors = FALSE)
 
 for.maxent.full <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
-                                  gsub(" ", ".", species), ".maxentdatafile.csv", sep = ""), row.names = 1)
+                                  gsub(" ", ".", species), ".maxentdatafile.region.csv", sep = ""), row.names = 1)
 upper.crit <- species.df.full$UCT...C.[species.df.full$Species==species]
 lower.crit <-species.df.full$LCT...C.[species.df.full$Species==species]
 predsnums <- c(1, 2, 5, 6, 7)
@@ -202,16 +192,12 @@ preds <- for.maxent.full[,predsnums+3]
 resp <- for.maxent.full[,"resp"] 
 thisRegMult <- 1
 params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false", "writeplotdata=true")
-require(rJava)
 maxent.model <- maxent(x = preds, p = resp, path = "./MaxentModels/ScratchDir/",
                        args = params)
-# maxnet.model <- maxnet( p = resp, data = preds, maxnet.formula(resp, preds, classes="lq"))
+areas.row <- AreaUnderResponseCurves(x = maxent.model, var = c("annualmeantemp", "maxtempwarmestmonth", "mintempcoldestmonth"), at = median,
+                                     expand = 10, data = NULL, fun = predict, upper.crit = upper.crit, lower.crit = lower.crit)
 
-savePlot(type = "jpeg", filename = paste0("./Species_Pts/", gsub(" ", ".", species), "/", 
-           gsub(" ", ".", species), ".jpeg"))
-response(maxent.model, "maxtempwarmestmonth")
-abline(v = c(upper.crit, lower.crit))
-dev.off()
+
 #########################################
 # Trying value extraction method
 

@@ -1,21 +1,31 @@
-{
-   .local <- function (x, var = NULL, at = median, range = "pa", 
-                       expand = 10, rug = FALSE, data = NULL, fun = predict, 
-                       ylim = c(0, 1), col = "red", lwd = 2, add = FALSE, ...) 
-   {
-      stopifnot(range %in% c("p", "pa")) #range is presence or presence absence
-      if (is.null(d)) { # Combines maxent feedout to presences and absences
-         d <- x@presence
-         if (range == "pa" & x@hasabsence) {
-            data <- rbind(d, x@absence)
-         }
-      }
+require(DescTools)
+x = maxent.model
+var = c("annualmeantemp", "maxtempwarmestmonth", "mintempcoldestmonth")
+at = median
+expand = 10
+data = NULL
+fun = predict
+upper.crit = upper.crit
+lower.crit = lower.crit
+
+# data = for.maxent.full
+
+   AreaUnderResponseCurves <- function (x, var, at = median,
+                       expand = 10, data = NULL, fun = predict, upper.crit, lower.crit,
+                       range = "pa") {
+      # stopifnot(range %in% c("p", "pa")) #range is presence or presence absence
+       if (is.null(data)) { # Combines maxent feedout to presences and absences
+          d <- x@presence
+          if (range == "pa" & x@hasabsence) {
+             d <- rbind(d, x@absence)
+          }
+       }
       cn <- colnames(d) # cn is colnames of data
       # if (is.null(var)) { # if var not provided, makes var all of column names
       #    var <- cn
       # }
       # if (is.numeric(var)) {
-      #    var <- cn[var]
+      #var <- cn[var]
       # }
       # if (length(var) == 1) {
       # }
@@ -23,15 +33,6 @@
       # if (length(var) == 0) {
       #    stop("var not found")
       # }
-      .doResponse(x, var, at, data, cn, expand, rug, ylim, 
-                  col, lwd, add, fun, ...)
-   }
-   .local(x, ...)
-}
-
-function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add, 
-          fun, ...) 
-{
    # if (length(var) > 1 & !add) { # setting parameters if var is > 1
    #    old.par <- graphics::par(no.readonly = TRUE)
    #    on.exit(graphics::par(old.par))
@@ -39,26 +40,27 @@ function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add,
    #    ys <- ceiling(length(var)/xs)
    #    graphics::par(mfrow = c(xs, ys))
    # }
-   f <- sapply(d, is.factor) # d is data - presence ans absence values. checks if any are factors
-   notf <- !f # data that is not factors
-   m <- matrix(nrow = 1, ncol = ncol(d)) # matrix with number of columns for data columns
+   #   f <- sapply(d, is.factor) # data that is not factors
+      notf <- !sapply(d, is.factor) # d is data - presence ans absence values. checks if any are factors; 
+      m <- matrix(nrow = 1, ncol = ncol(d))
+      
    # if (is.null(at)) { # at is a function to indicate what level other variables should be fixed at
    #    m <- d # putting data in the matrix 
    #    nrm <- nrow(m)
    # }
    # else 
-   if (is.function(at)) { # Dealing with functions in case you put one in for at
-      if (sum(notf) > 0) {
-         m[notf] <- as.numeric(apply(d[, notf, drop = FALSE],
-                                     2, at))
-      }
-      # if (sum(f) > 0) {
-      #    m[f] <- as.numeric(apply(d[, f, drop = FALSE], 2,
-      #                             modal))
-      # }
-      m <- matrix(m, nrow = 100, ncol = length(m), byrow = TRUE)
+   # if (is.function(at)) { # Dealing with functions in case you put one in for at
+   #if (sum(notf) > 0) {
+      m[notf] <- as.numeric(apply(d[, notf, drop = FALSE], 
+                                  2, at))
+   #}
+   #if (sum(f) > 0) {
+   #   m[f] <- as.numeric(apply(d[, f, drop = FALSE], 2, 
+   #                            modal))
+   #}
+      m <- matrix(m, nrow = 100, ncol = length(m), byrow = TRUE) # Uses the median to do something? I think it's keeping other variables at median
       colnames(m) <- cn
-   }
+   #}
    # else {
    #    at <- at[cn]
    #    m <- as.vector(at)
@@ -66,6 +68,9 @@ function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add,
    #    colnames(m) <- names(at)
    # }
    m <- data.frame(m)
+   df <- data.frame("full.area" = numeric(), "above.lower.crit" = numeric(), 
+              "below.lower.crit" = numeric(), "above.upper.crit" = numeric(), 
+              "area.between.crits" = numeric())
    for (vr in var) {
       i <- which(cn == vr)
       # if (is.null(at)) {
@@ -95,8 +100,8 @@ function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add,
          #    v <- v[1:100]
          #    fact <- TRUE
          # }
-         # else {
-            fact <- FALSE
+         
+            # fact <- FALSE
             r <- range(v)
             expand <- round(abs(expand))
             v <- (r[1] - expand) + 0:(nr - 1) * (r[2] - r[1] + 
@@ -122,9 +127,26 @@ function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add,
          #         col = col, lwd = lwd, ylim = ylim, ...)
          # }
          # else {
-            plot(pd, xlab = vr, ylab = "predicted value",
-                 col = col, lwd = lwd, ylim = ylim, type = "l")
-            AUC(x = pd[,1]>=lower.crit, y = pd[,2])
+            plot(pd, xlab = vr, ylab = "predicted value", ylim = c(0,1), type = "l",
+                 col = "red", lwd = 3)
+            abline(v = upper.crit)
+            abline(v = lower.crit)
+            full.area <- AUC(x = pd[,1], y = pd[,2])
+            if (vr == "mintempcoldestmonth") {
+               above.lower.crit <- AUC(x = pd[,1][pd[,1]>=lower.crit], y = pd[,2][pd[,1]>=lower.crit],
+                                    method = "step")/full.area
+               below.lower.crit <- AUC(x = pd[,1][pd[,1]<lower.crit], y = pd[,2][pd[,1]<lower.crit])/full.area
+            }
+            if (vr == "maxtempwarmestmonth") {
+               below.upper.crit <- AUC(x = pd[,1][pd[,1]<=upper.crit], y = pd[,2][pd[,1]<=upper.crit])/full.area
+               above.upper.crit <- AUC(x = pd[,1][pd[,1]>upper.crit], y = pd[,2][pd[,1]>upper.crit])/full.area
+            }
+            if (vr == "annualmeantemp") {
+               area.between.crits <- AUC(x = pd[,1][pd[,1]<=upper.crit & pd[,1]>=lower.crit],
+                                      y = pd[,2][pd[,1]<=upper.crit & pd[,1]>=lower.crit])/full.area
+               mean.full.area <- AUC(x = pd[,1], y = pd[,2])
+            }
+            
          #}
          # if (rug) {
          #    if (!is.factor(d[, i])) {
@@ -132,9 +154,13 @@ function (x, var, at, d, cn, expand, rug, ylim, col, lwd, add,
          #           col = "blue")
          #    }
          # }
-      }
+      
    }
-   if (length(var) == 1) {
-      return(invisible(pd))
+    this.row <- data.frame(full.area, above.lower.crit, below.lower.crit,
+                                   above.upper.crit, below.upper.crit, area.between.crits)
+   return(this.row)
+   #if (length(var) == 1) {
+   #   return(invisible(pd))
+   #}
    }
-}
+   
