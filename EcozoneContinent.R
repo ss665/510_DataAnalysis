@@ -30,8 +30,8 @@ for (i in 1:nrow(sample.df)){
    # spatial points file that I made earlier
    species.pts.spdf <- readOGR(dsn = paste0("./Species_Pts/", gsub(" ", ".", species), "/"), 
                                          layer = paste0(gsub(" ", ".", species),"sp.pts"))
-   #species.pts.thinned <- elimCellDups(SpatialPoints(coordinates(species.pts.orig), 
-   #                                               proj4string = crs(clim)), clim[[5]])
+   species.pts.thinned <- elimCellDups(SpatialPoints(coordinates(species.pts.orig), 
+                                                  proj4string = crs(clim)), clim[[5]])
    #species.pts <- over(species.pts.thinned, species.pts.orig)
    #species.pts.spdf <- SpatialPointsDataFrame(coords = data.frame(species.pts$dcmlLng, species.pts$dcmlLtt),
    #                                          proj4string=gbif.prj, data=species.pts)
@@ -41,12 +41,12 @@ for (i in 1:nrow(sample.df)){
    #sp.buffer <- buffer(species.pts.spdf, width = 10000, dissolve = FALSE, progress= TRUE)
    #print("Buffered, overlapping")
    sp.over.df <- as.data.frame(extract(y = SpatialPoints(coordinates(species.pts.spdf), proj4string=gbif.prj), 
-                      buffer = 200000, x = ecoregion.raster, small = TRUE, df = TRUE,
-                      progress = TRUE))
+                      buffer = 10000, x = ecoregion.raster, small = TRUE, df = TRUE,
+                      progress = "text"))
    
    sp.over.sort <- sp.over.df[order(sp.over.df$layer),]
    sp.over <- sp.over.sort[!duplicated(sp.over.sort$ID),]
-   sp.over <- merge(sp.over, ecoregions.df[,2:3], all.x = TRUE)
+   sp.over <- merge(x = sp.over, y = ecoregions.df[,1:3], all.x = TRUE, by.x = "layer", by.y = "ID")
    #sp.over <- over(sp.buffer, ecoregion[,c("region", "biome")])
    print("Extract 1 Finished")
    # need to do this stuff to keep the data frame nice
@@ -61,7 +61,7 @@ for (i in 1:nrow(sample.df)){
    these.biomes.spdf <- ecoregion[as.vector(!is.na(match(ecoregion$biome,biomes))),]
    # generate random points, same number as observations
    print("Generating random points")
-   random.pts.region <- spsample(these.regions.spdf, n=nrow(species.pts.spdf), type="random")
+   random.pts.region <- spsample(these.regions.spdf, n=10000, type="random")
    random.pts.biome <- spsample(these.biomes.spdf, n=nrow(species.pts.spdf), type = "random")
    
    # I want to save this info now
@@ -82,7 +82,7 @@ for (i in 1:nrow(sample.df)){
 
    # Extract climate data
    
-   df.clim.region <- as.data.frame(extract(clim, cbind(for.maxent.pts.region$x, for.maxent.pts.region$y)))
+   df.clim.region <- as.data.frame(extract(clim, y = SpatialPoints(coordiantes(for.maxent.pts.region), proj4string=gbif.prj)))
    df.clim.biome <- as.data.frame(extract(clim, cbind(for.maxent.pts.biome$x, for.maxent.pts.biome$y)))
    print(paste(as.character(species), "climate extraction completed"))
    # gotta rename the climate variable names for the columns. 
@@ -110,7 +110,7 @@ for (i in 1:nrow(sample.df)){
 
 
 # Want to compare temperatures at occupied and random locations
-par(mfrow = c(3, 2))
+par(mfrow = c(2, 5), oma = c(0,2,2,0), mar = c(2, 1, 3, .5), mgp = c(3,.5,0), font.main = 1)
 for (i in 1:nrow(sample.df)){
    species <- sample.df[i, 1]
    for.maxent.full.region <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
@@ -121,12 +121,15 @@ for (i in 1:nrow(sample.df)){
                          "Biome.Maxtemp" = for.maxent.full.biomes$maxtempwarmestmonth,
                          "Region.Mintemp" = for.maxent.full.region$mintempcoldestmonth,
                          "Biome.Mintemp" = for.maxent.full.biomes$mintempcoldestmonth)
-   boxplot.matrix(as.matrix(compare[,1:2]), main = paste0(sample.df[i, 4], ", ", species), 
-                  sub = sample.df[i, 3])
+   boxplot.matrix(as.matrix(compare[,1:2]), main = paste0(sample.df[i, 4], "\n", species), 
+                  sub = sample.df[i, 3],  names = c("Region", "Biome"))
+   if (i == 1 | i == 6) {mtext(side = 2, text = "Temperature (ºC)", line = 1.5, cex = .7)}
+   if (i == 1) {mtext("Random Points Maximum Temperatures", outer = TRUE)}
    
 }
 
-par(mfrow = c(3, 2))
+
+par(mfrow = c(2, 5), oma = c(0,2,2,0), mar = c(2, 1, 3, .5), mgp = c(3,.5,0), font.main = 1)
 for (i in 1:nrow(sample.df)){
    species <- sample.df[i, 1]
    for.maxent.full.region <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
@@ -137,8 +140,10 @@ for (i in 1:nrow(sample.df)){
                          "Biome.Maxtemp" = for.maxent.full.biomes$maxtempwarmestmonth,
                          "Region.Mintemp" = for.maxent.full.region$mintempcoldestmonth,
                          "Biome.Mintemp" = for.maxent.full.biomes$mintempcoldestmonth)
-   boxplot.matrix(as.matrix(compare[,3:4]), main = paste0(sample.df[i, 4], ", ", species), 
-                  sub = sample.df[i, 3])
+   boxplot.matrix(as.matrix(compare[,3:4]), main = paste0(sample.df[i, 4], "\n", species), 
+                  sub = sample.df[i, 3],  names = c("Region", "Biome"))
+   if (i == 1 | i == 6) {mtext(side = 2, text = "Temperature (ºC)", line = 1.5, cex = .7)}
+   if (i == 1) {mtext("Random Points Minimum Temperatures", outer = TRUE)}
    
 }
 
@@ -175,7 +180,7 @@ for (i in 1:nrow(sample.df)){
    lower.crit <-species.df.full$LCT...C.[species.df.full$Species==species]
    predsnums <- c(1, 2, 5, 6, 7)
    preds <- for.maxent.full[,predsnums+3]
-   resp <- for.maxent.full[,"resp"] 
+   resp <- for.maxent.full[,"resp"]
    thisRegMult <- 1
    params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false")
    dir.create(paste0("./MaxentModels/",gsub(" ", ".", species)))
@@ -189,7 +194,7 @@ for (i in 1:nrow(sample.df)){
                                           ".full.tif"), overwrite = TRUE)
    par(mfrow = c(1,1))
    plot(sp.raster, main = "Region Amadina fasciata")
-   species.pts.spdf <- readOGR(dsn = paste0("./Species_Pts/", gsub(" ", ".", species), "/"), 
+   species.pts.spdf <- readOGR(dsn = paste0("./Species_Pts/", gsub(" ", ".", species), "/"),
                                layer = paste0(gsub(" ", ".", species),"sp.pts"))
    random.pts.spdf <- SpatialPoints(coordinates(for.maxent.full[for.maxent.full$resp==0,][,2:3]), proj4string=gbif.prj)
    plot(random.pts.spdf, add = TRUE)
@@ -200,7 +205,7 @@ for (i in 1:nrow(sample.df)){
                                         expand = 10, data = NULL, fun = predict, upper.crit = upper.crit, lower.crit = lower.crit)
    df <- rbind(cbind("species" = species, areas.row), df)
    write.csv(df, paste0("./SummaryTables/response.suitability.",bor,".csv"))
-   
+
    
    #Evaluating climate at occurence points
    species.pts.climate <- dplyr::filter(for.maxent.full, for.maxent.full$resp == 1)
@@ -211,8 +216,8 @@ for (i in 1:nrow(sample.df)){
    below.mintemp <- sum(species.pts.climate$mintempcoldestmonth < lower.crit)
    
    
-   maxtemp.loc <- max(species.pts.climate$maxtempwarmestmonth)
-   mintemp.loc <- min(species.pts.climate$mintempcoldestmonth)
+   maxtemp.loc <- mean(species.pts.climate$maxtempwarmestmonth)
+   mintemp.loc <- mean(species.pts.climate$mintempcoldestmonth)
    meantemp.loc <- mean(species.pts.climate$annualmeantemp)
    nobs <- nrow(species.pts.climate)
    
@@ -221,7 +226,7 @@ for (i in 1:nrow(sample.df)){
                                       "above.mintemp" = above.mintemp, "maxtemp.loc" = maxtemp.loc, 
                                       "mintemp.loc" = mintemp.loc, "meantemp.loc" = meantemp.loc,
                                       "nobs" = nobs, "maxcrit" = upper.crit, "mincrit" = lower.crit), pts.climate.df)
-   write.csv(pts.climate.df, paste0("./SummaryTables/ptssuitability.",bor,".csv"))
+   write.csv(pts.climate.df, "./SummaryTables/Continent V Ecoregion/ptssuitability.csv")
 }
 
 ### misc code
@@ -229,3 +234,24 @@ for (i in 1:nrow(sample.df)){
 #                                   proj4string=gbif.prj, data=for.maxent.full.region)
 
 plot(region.spdf, add = TRUE)
+
+ptsuitability.df <- read.csv("./SummaryTables/Continent V Ecoregion/ptssuitability.csv", row.names = 1)
+respsuitability.df <- read.csv("./SummaryTables/Continent V Ecoregion/response.suitability.csv", row.names=1)
+boxplot(data = ptsuitability.df, as.matrix(data.frame("Pts Max Temp" = ptsuitability.df$maxtemp.loc, 
+                                                      "Pts Min Temp" = ptsuitability.df$mintemp.loc,
+                                                      "Maximum Critical" = ptsuitability.df$maxcrit,
+                                                      "Minimum Critical" = ptsuitability.df$mincrit)),
+        ylab = "Mean Temperature Accross Points (ªC)", main = "Mean Values for 10 Species")
+
+# Percent of observations that exist in maximum/minimum temperature observations less than or
+# equal to critical temperatures
+
+boxplot(data = ptsuitability.df, as.matrix(data.frame("perc.obs.lt.mintemp" = ptsuitability.df$below.mintemp/ptsuitability.df$nobs, 
+                                                      "perc.obs.gt.maxtemp" = ptsuitability.df$above.maxtemp/ptsuitability.df$nobs)),
+        ylab = "Mean Percent Observations", main = "Threshold Comparison", names = c("% <= Min Crit", "% >= Max Crit"))
+
+par(mfrow = c(1, 3), oma = c(0, 1, 2, 0))
+boxplot(data = respsuitability.df, below.lower.crit ~ region.biome, ylab = "Area Under Curve", main = "Below Min Crit")
+boxplot(data = respsuitability.df, above.upper.crit ~ region.biome, main = "Above Max Crit")
+boxplot(data = respsuitability.df, area.between.crits ~ region.biome, main = "Between Crit Temps")
+mtext("Area Under Response Curves", outer = TRUE, cex = 1)

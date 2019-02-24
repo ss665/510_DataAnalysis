@@ -749,11 +749,103 @@ for (i in 1:nrow(sample.df)){
    }
    
    
-   
+   #### old code before I implemented select_max
    
    
    #cur.runtime <- Sys.time()-starttime
-   
+   species.df <- read.csv("simple.species.csv", row.names = 1, stringsAsFactors = FALSE)
+   species.df.full <- read.csv("Species_Table_021619.csv", row.names = 1, stringsAsFactors = FALSE)
+   df <- data.frame("species" = character(), "full.area" = numeric(), "above.lower.crit" = numeric(), "below.lower.crit" = numeric(),
+                    "above.upper.crit" = numeric(), "below.upper.crit" = numeric(), 
+                    "area.between.crits" = numeric())
+   pts.climate.df <- data.frame("species" = character(), "below.maxtemp" = numeric(), 
+                                "above.maxtemp" = numeric(), "below.mintemp" = numeric(), 
+                                "above.mintemp" = numeric(), "maxtemp.loc" = numeric(), 
+                                "mintemp.loc" = numeric(), "maxcrit" = numeric(), "mincrit" = numeric(),
+                                "nobs" = integer())
+   sample.df <- species.df[c(154, 376, 393, 19, 409, 361, 131, 26, 281, 133),]
+   # type in biome or region here to get appropriate points
+   bor = "biome"
+   par(mfrow = c(1, 3))
+   for (i in 1:nrow(sample.df)){
+      species = sample.df[i, 1]
+      print(species)
+      for.maxent.full <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
+                                        gsub(" ", ".", species), ".maxentdatafile.",bor,".csv", sep = ""), row.names = 1)
+      upper.crit <- species.df.full$UCT...C.[species.df.full$Species==species]
+      lower.crit <-species.df.full$LCT...C.[species.df.full$Species==species]
+      predsnums <- c(1, 2, 5, 6, 7)
+      preds <- for.maxent.full[,predsnums+3]
+      resp <- for.maxent.full[,"resp"] 
+      thisRegMult <- 1
+      params <- c(paste("betamultiplier=", thisRegMult, sep=""), "jackknife=false")
+      dir.create(paste0("./MaxentModels/",gsub(" ", ".", species)))
+      maxent.model <- maxent(x = preds, p = resp, path = paste0("./MaxentModels/",gsub(" ", ".", species)),
+                             args = params, silent = FALSE)
+      
+      areas.row <- AreaUnderResponseCurves(x = maxent.model, var = c("annualmeantemp", "maxtempwarmestmonth", "mintempcoldestmonth"), at = median,
+                                           expand = 10, data = NULL, fun = predict, upper.crit = upper.crit, lower.crit = lower.crit)
+      df <- rbind(cbind("species" = species, areas.row), df)
+      write.csv(df, paste0("./SummaryTables/response.suitability.",bor,".csv"))
+      
+      
+      #Evaluating climate at occurence points
+      species.pts.climate <- dplyr::filter(for.maxent.full, for.maxent.full$resp == 1)
+      species.pts.climate <- species.pts.climate[!is.na(species.pts.climate$maxtempwarmestmonth),]
+      below.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth <= upper.crit)
+      above.mintemp <- sum(species.pts.climate$mintempcoldestmonth >= lower.crit)
+      above.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth > upper.crit)
+      below.mintemp <- sum(species.pts.climate$mintempcoldestmonth < lower.crit)
+      
+      
+      maxtemp.loc <- max(species.pts.climate$maxtempwarmestmonth)
+      mintemp.loc <- min(species.pts.climate$mintempcoldestmonth)
+      meantemp.loc <- mean(species.pts.climate$annualmeantemp)
+      nobs <- nrow(species.pts.climate)
+      
+      pts.climate.df <- rbind(data.frame("species" = species, "below.maxtemp" = below.maxtemp, 
+                                         "above.maxtemp" = above.maxtemp, "below.mintemp" = below.mintemp, 
+                                         "above.mintemp" = above.mintemp, "maxtemp.loc" = maxtemp.loc, 
+                                         "mintemp.loc" = mintemp.loc, "meantemp.loc" = meantemp.loc,
+                                         "nobs" = nobs, "maxcrit" = upper.crit, "mincrit" = lower.crit), pts.climate.df)
+      write.csv(pts.climate.df, paste0("./SummaryTables/ptssuitability.",bor,".csv"))
+   }
+   ######################################################################
+   # species.df <- read.csv("simple.species.csv", row.names = 1, stringsAsFactors = FALSE)
+   # species.df.full <- read.csv("Species_Table_021619.csv", row.names = 1, stringsAsFactors = FALSE)
+   # 
+   # sample.df <- species.df[c(154, 376, 393, 19, 409),]
+   # pts.climate.df <- data.frame("species" = character(), "below.maxtemp" = numeric(), 
+   #                              "above.maxtemp" = numeric(), "below.mintemp" = numeric(), 
+   #                              "above.mintemp" = numeric(), "maxtemp.loc" = numeric(), 
+   #                              "mintemp.loc" = numeric(), "nobs" = integer())
+   # for (i in 1:nrow(sample.df)){
+   #    species = sample.df[i, 1]
+   #    
+   #    # Just getting maxtemp and mintemp where the species is found and comparing it
+   #    
+   #    for.maxent.full <- read.csv(paste("./Species_Pts/", gsub(" ", ".", species), "/", 
+   #                                      gsub(" ", ".", species), ".maxentdatafile.csv", sep = ""), row.names = 1)
+   #    species.pts.climate <- dplyr::filter(for.maxent.full, for.maxent.full$resp == 1)
+   #    species.pts.climate <- species.pts.climate[!is.na(species.pts.climate$maxtempwarmestmonth),]
+   #    below.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth <= upper.crit)
+   #    above.mintemp <- sum(species.pts.climate$mintempcoldestmonth >= lower.crit)
+   #    above.maxtemp <- sum(species.pts.climate$maxtempwarmestmonth > upper.crit)
+   #    below.mintemp <- sum(species.pts.climate$mintempcoldestmonth < lower.crit)
+   #    
+   #    
+   #    maxtemp.loc <- max(species.pts.climate$maxtempwarmestmonth)
+   #    mintemp.loc <- min(species.pts.climate$mintempcoldestmonth)
+   #    meantemp.loc <- mean(species.pts.climate$annualmeantemp)
+   #    nobs <- nrow(species.pts.climate)
+   #    
+   #    pts.climate.df <- rbind(data.frame("species" = species, "below.maxtemp" = below.maxtemp, 
+   #                                       "above.maxtemp" = above.maxtemp, "below.mintemp" = below.mintemp, 
+   #                                       "above.mintemp" = above.mintemp, "maxtemp.loc" = maxtemp.loc, 
+   #                                       "mintemp.loc" = mintemp.loc, "meantemp.loc" = meantemp.loc,
+   #                                       "nobs" = nobs), pts.climate.df)
+   #    write.csv(pts.climate.df, "./SummaryTables/ptssuitability")
+   # }
    
    
 
