@@ -16,7 +16,7 @@ simple.species <- read.csv("simple.species.csv", row.names = 1, stringsAsFactors
 gbif.prj <- CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")
 clim <- brick("clim10m")
 
-species.df <- simple.species[simple.species$nObs<100000,]
+species.df <- simple.species[!simple.species$nObs<10,]
 
 # Sample DF
 sample.df <- species.df[c(154, 376, 393, 19, 409, 361, 131, 26, 281, 133),]
