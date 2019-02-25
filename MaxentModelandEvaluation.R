@@ -27,6 +27,8 @@ for (i in 1:nrow(sample.df)){
                                      gsub(" ", ".", species), ".maxentdatafile.",bor,".csv", sep = ""), row.names = 1)
    upper.crit <- species.df.full$UCT...C.[species.df.full$Species==species]
    lower.crit <-species.df.full$LCT...C.[species.df.full$Species==species]
+   # Only using Mean Annual Temp, Mean Diurnal Range, Max Temp Warm Month,
+   # Min temp coldest month, temp annual range
    predsnums <- c(1, 2, 5, 6, 7)
    preds <- for.maxent.full[,predsnums+3]
    resp <- for.maxent.full[,"resp"] 
